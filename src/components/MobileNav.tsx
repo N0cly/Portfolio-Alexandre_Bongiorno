@@ -53,7 +53,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
 
       {/* Overlay — fade smooth + léger scale */}
       <div
-        className="fixed inset-0 z-60 flex flex-col bg-[#fafaf8] md:hidden"
+        className="fixed top-0 left-0 right-0 inset-0 z-60 flex flex-col bg-[#fafaf8] md:hidden"
         style={{
           opacity: open ? 1 : 0,
           transform: open ? "scale(1)" : "scale(1.02)",

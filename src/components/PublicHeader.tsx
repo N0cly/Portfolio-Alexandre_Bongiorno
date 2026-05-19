@@ -36,7 +36,7 @@ export async function PublicHeader() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-neutral-200 bg-[#fafaf8]/85 backdrop-blur">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-neutral-200 bg-[#fafaf8]/85 backdrop-blur">
       <div className="flex w-full items-center justify-between px-6 py-5 md:px-10 md:py-6">
         <Link
           href="/"
