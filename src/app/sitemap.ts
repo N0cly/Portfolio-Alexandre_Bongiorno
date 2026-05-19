@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { getAllTags } from "@/lib/tags";
 
 function getBaseUrl(): string {
@@ -38,7 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         updatedAt: photos.updatedAt,
       })
       .from(photos)
-      .where(eq(photos.visible, true))
+      .where(and(eq(photos.visible, true), eq(photos.clientOnly, false)))
       .orderBy(desc(photos.updatedAt));
 
     const photoRoutes: MetadataRoute.Sitemap = photoRows.map((p) => ({

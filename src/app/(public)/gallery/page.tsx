@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc } from "drizzle-orm";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
 import { getAllTags } from "@/lib/tags";
 
@@ -17,7 +17,7 @@ async function getPhotos() {
     return await db
       .select()
       .from(photos)
-      .where(eq(photos.visible, true))
+      .where(and(eq(photos.visible, true), eq(photos.clientOnly, false)))
       .orderBy(asc(photos.order), desc(photos.createdAt));
   } catch {
     return [];

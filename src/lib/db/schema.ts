@@ -43,6 +43,7 @@ export const photos = pgTable("photos", {
   category: text("category"),
   tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
   slug: text("slug").unique(),
+  clientOnly: boolean("client_only").notNull().default(false),
   storageKey: text("storage_key").notNull(),
   url: text("url").notNull(),
   thumbnailUrl: text("thumbnail_url"),

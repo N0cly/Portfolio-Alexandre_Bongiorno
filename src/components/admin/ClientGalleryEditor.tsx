@@ -9,6 +9,7 @@ import {
   addPhotosToGallery,
   removePhotoFromGallery,
 } from "@/app/admin/client-galleries/actions";
+import { ClientGalleryUploader } from "./ClientGalleryUploader";
 
 type GalleryData = {
   id: string;
@@ -272,6 +273,21 @@ export function ClientGalleryEditor({
         </div>
       </section>
 
+      {/* Upload de photos privées (clientOnly) */}
+      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
+        <header className="mb-4">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-neutral-500">
+            Upload de photos privées
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Ces photos seront exclusivement visibles dans cette galerie client
+            (jamais sur le site public). Idéal pour livrer un shooting privé
+            sans ajouter les photos à ton portfolio.
+          </p>
+        </header>
+        <ClientGalleryUploader galleryId={gallery.id} />
+      </section>
+
       {/* Photos dans la galerie */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <h2 className="mb-4 text-sm uppercase tracking-[0.2em] text-neutral-500">
@@ -309,16 +325,17 @@ export function ClientGalleryEditor({
         )}
       </section>
 
-      {/* Photo picker */}
+      {/* Photo picker — ajoute des photos du portfolio existant */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
         <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-sm uppercase tracking-[0.2em] text-neutral-500">
-              Ajouter des photos
+              Ajouter depuis le portfolio
             </h2>
             <p className="mt-1 text-xs text-neutral-500">
-              Clique pour sélectionner, puis valide. Toutes tes photos sont
-              listées (200 max), quel que soit leur statut public/masqué.
+              Sélectionne des photos déjà présentes dans ton portfolio. Pour
+              uploader des photos uniquement pour ce client, utilise la section
+              ci-dessus.
             </p>
           </div>
           {pickedIds.size > 0 && (

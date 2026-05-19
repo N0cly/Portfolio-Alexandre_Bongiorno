@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
 import { PhotosManager } from "@/components/admin/PhotosManager";
@@ -13,7 +13,12 @@ async function getPhotos(view: View) {
       const rows = await db
         .select()
         .from(photos)
-        .where(inArray(photos.placement, ["hero", "featured"]))
+        .where(
+          and(
+            eq(photos.clientOnly, false),
+            inArray(photos.placement, ["hero", "featured"]),
+          ),
+        )
         .orderBy(
           // 1. Visibles d'abord
           sql`case when ${photos.visible} = true then 0 else 1 end asc`,
@@ -33,6 +38,7 @@ async function getPhotos(view: View) {
     const rows = await db
       .select()
       .from(photos)
+      .where(eq(photos.clientOnly, false))
       .orderBy(
         sql`case when ${photos.visible} = true then 0 else 1 end asc`,
         sql`case ${photos.placement}
@@ -57,11 +63,17 @@ async function getCounts() {
   try {
     const [total] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(photos);
+      .from(photos)
+      .where(eq(photos.clientOnly, false));
     const [selection] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(photos)
-      .where(inArray(photos.placement, ["hero", "featured"]));
+      .where(
+        and(
+          eq(photos.clientOnly, false),
+          inArray(photos.placement, ["hero", "featured"]),
+        ),
+      );
     return {
       all: total?.count ?? 0,
       selection: selection?.count ?? 0,

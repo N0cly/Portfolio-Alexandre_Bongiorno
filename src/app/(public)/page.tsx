@@ -24,7 +24,13 @@ async function getHomepageData() {
     const heroRows = await db
       .select()
       .from(photos)
-      .where(and(eq(photos.visible, true), eq(photos.placement, "hero")))
+      .where(
+        and(
+          eq(photos.visible, true),
+          eq(photos.clientOnly, false),
+          eq(photos.placement, "hero"),
+        ),
+      )
       .orderBy(asc(photos.featuredOrder), desc(photos.createdAt))
       .limit(1);
 
@@ -38,6 +44,7 @@ async function getHomepageData() {
       .where(
         and(
           eq(photos.visible, true),
+          eq(photos.clientOnly, false),
           inArray(photos.placement, ["hero", "featured"]),
           hero ? ne(photos.id, hero.id) : undefined,
         ),
@@ -51,7 +58,7 @@ async function getHomepageData() {
       const fallback = await db
         .select()
         .from(photos)
-        .where(eq(photos.visible, true))
+        .where(and(eq(photos.visible, true), eq(photos.clientOnly, false)))
         .orderBy(asc(photos.order), desc(photos.createdAt))
         .limit(1);
       finalHero = fallback[0];
@@ -60,7 +67,7 @@ async function getHomepageData() {
     const [{ total }] = await db
       .select({ total: count() })
       .from(photos)
-      .where(eq(photos.visible, true));
+      .where(and(eq(photos.visible, true), eq(photos.clientOnly, false)));
 
     return { hero: finalHero, featured: featuredRows, total };
   } catch {

@@ -15,6 +15,7 @@ async function getPhotosForTag(tagName: string) {
       .where(
         and(
           eq(photos.visible, true),
+          eq(photos.clientOnly, false),
           sql`${tagName} = any(${photos.tags})`,
         ),
       )

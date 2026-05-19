@@ -16,6 +16,7 @@ async function getPhotoBySlug(slug: string) {
       .where(
         and(
           eq(photos.visible, true),
+          eq(photos.clientOnly, false),
           or(eq(photos.slug, slug), sql`${photos.id}::text = ${slug}`),
         ),
       )
@@ -34,6 +35,7 @@ async function getNeighbours(currentOrder: number, currentId: string) {
       .where(
         and(
           eq(photos.visible, true),
+          eq(photos.clientOnly, false),
           sql`(${photos.order} > ${currentOrder} or (${photos.order} = ${currentOrder} and ${photos.id}::text > ${currentId}))`,
         ),
       )
@@ -46,6 +48,7 @@ async function getNeighbours(currentOrder: number, currentId: string) {
       .where(
         and(
           eq(photos.visible, true),
+          eq(photos.clientOnly, false),
           sql`(${photos.order} < ${currentOrder} or (${photos.order} = ${currentOrder} and ${photos.id}::text < ${currentId}))`,
         ),
       )
@@ -67,6 +70,7 @@ async function getSimilarPhotos(tags: string[], excludeId: string) {
       .where(
         and(
           eq(photos.visible, true),
+          eq(photos.clientOnly, false),
           sql`${photos.tags} && ${tags}::text[]`,
           sql`${photos.id}::text <> ${excludeId}`,
         ),

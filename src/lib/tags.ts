@@ -18,7 +18,7 @@ export async function getAllTags(): Promise<TagInfo[]> {
           unnest(${photos.tags}) as tag,
           count(*)::int as count
         from ${photos}
-        where ${photos.visible} = true
+        where ${photos.visible} = true and ${photos.clientOnly} = false
         group by tag
         order by count desc, tag asc
       `,
@@ -53,6 +53,7 @@ export async function getAllAdminTags(): Promise<string[]> {
         select distinct unnest(${photos.tags}) as tag
         from ${photos}
         where array_length(${photos.tags}, 1) > 0
+          and ${photos.clientOnly} = false
         order by tag asc
       `,
     );
