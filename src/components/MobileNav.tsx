@@ -40,17 +40,17 @@ export function MobileNav({ links }: { links: NavLink[] }) {
         onClick={() => setOpen(true)}
         aria-label="Ouvrir le menu"
         aria-expanded={open}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-neutral-100 md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full transition bg-neutral-900 md:hidden"
       >
         <span className="flex flex-col gap-[6px]">
-          <span className="block h-px w-6 bg-neutral-900" />
-          <span className="block h-px w-6 bg-neutral-900" />
+          <span className="block h-px w-6 bg-neutral-100" />
+          <span className="block h-px w-6 bg-neutral-100" />
         </span>
       </button>
 
       {/* Overlay — fixed donc indépendant du flow ; md:hidden pour ne jamais apparaître desktop */}
       <div
-        className={`fixed inset-0 z-[60] flex flex-col bg-[#fafaf8] transition-opacity duration-300 ease-out md:hidden ${
+        className={`fixed inset-0 z-60 flex flex-col bg-[#fafaf8] transition-opacity duration-300 ease-out md:hidden ${
           open
             ? "pointer-events-auto opacity-100"
             : "pointer-events-none opacity-0"
@@ -63,7 +63,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Fermer le menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-neutral-200/60"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full transition bg-neutral-200/60"
           >
             <svg
               width="22"
@@ -80,7 +80,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
         </div>
 
         {/* Liens centrés */}
-        <nav className="flex flex-1 flex-col items-center justify-center gap-8 px-8 pb-24">
+        <nav className="flex flex-1 flex-col items-center justify-center gap-8 px-8 pb-24 bg-[#fafaf8]">
           {links.map((link, i) => {
             const baseClass =
               "text-4xl font-light tracking-tight text-neutral-900 transition-all duration-500 ease-out";
