@@ -10,6 +10,9 @@ type NavLink = {
   id?: string;
 };
 
+// Courbe d'easing « ease-out-expo » — douce, naturelle, premium
+const SMOOTH_EASE = "cubic-bezier(0.16, 1, 0.3, 1)";
+
 export function MobileNav({ links }: { links: NavLink[] }) {
   const [open, setOpen] = useState(false);
 
@@ -40,7 +43,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
         onClick={() => setOpen(true)}
         aria-label="Ouvrir le menu"
         aria-expanded={open}
-        className="inline-flex h-10 w-10 items-center justify-center rounded-full transition bg-neutral-900 md:hidden"
+        className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-900 transition md:hidden"
       >
         <span className="flex flex-col gap-[6px]">
           <span className="block h-px w-6 bg-neutral-100" />
@@ -48,22 +51,33 @@ export function MobileNav({ links }: { links: NavLink[] }) {
         </span>
       </button>
 
-      {/* Overlay — fixed donc indépendant du flow ; md:hidden pour ne jamais apparaître desktop */}
+      {/* Overlay — fade smooth + léger scale */}
       <div
-        className={`fixed inset-0 z-60 flex flex-col bg-[#fafaf8] transition-opacity duration-300 ease-out md:hidden ${
-          open
-            ? "pointer-events-auto opacity-100"
-            : "pointer-events-none opacity-0"
-        }`}
+        className="fixed inset-0 z-60 flex flex-col bg-[#fafaf8] md:hidden"
+        style={{
+          opacity: open ? 1 : 0,
+          transform: open ? "scale(1)" : "scale(1.02)",
+          transformOrigin: "top right",
+          transition: `opacity 600ms ${SMOOTH_EASE}, transform 600ms ${SMOOTH_EASE}`,
+          pointerEvents: open ? "auto" : "none",
+          willChange: "opacity, transform",
+        }}
         aria-hidden={!open}
       >
         {/* Header overlay : close button */}
-        <div className="flex items-center justify-end px-6 py-5">
+        <div
+          className="flex items-center justify-end px-6 py-5"
+          style={{
+            opacity: open ? 1 : 0,
+            transition: `opacity 400ms ${SMOOTH_EASE}`,
+            transitionDelay: open ? "150ms" : "0ms",
+          }}
+        >
           <button
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Fermer le menu"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full transition bg-neutral-200/60"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-neutral-200/60 transition hover:bg-neutral-300/80"
           >
             <svg
               width="22"
@@ -79,17 +93,22 @@ export function MobileNav({ links }: { links: NavLink[] }) {
           </button>
         </div>
 
-        {/* Liens centrés */}
-        <nav className="flex flex-1 flex-col items-center justify-center gap-8 px-8 pb-24 bg-[#fafaf8]">
+        {/* Liens centrés avec stagger très smooth */}
+        <nav className="flex flex-1 flex-col items-center justify-center gap-8 bg-[#fafaf8] px-8 pb-24">
           {links.map((link, i) => {
-            const baseClass =
-              "text-4xl font-light tracking-tight text-neutral-900 transition-all duration-500 ease-out";
-            const stateClass = open
-              ? "opacity-100 translate-y-0"
-              : "opacity-0 translate-y-4";
+            // À l'ouverture : stagger doux par index, du 1er au dernier
+            // À la fermeture : stagger inverse plus rapide (le dernier disparaît en premier)
+            const enterDelay = 250 + i * 90;
+            const exitDelay = (links.length - 1 - i) * 30;
+            const className =
+              "text-4xl font-light tracking-tight text-neutral-900 hover:opacity-70";
             const style: React.CSSProperties = {
               fontFamily: "var(--font-serif)",
-              transitionDelay: open ? `${120 + i * 70}ms` : "0ms",
+              opacity: open ? 1 : 0,
+              transform: open ? "translateY(0)" : "translateY(20px)",
+              transition: `opacity 700ms ${SMOOTH_EASE}, transform 700ms ${SMOOTH_EASE}`,
+              transitionDelay: `${open ? enterDelay : exitDelay}ms`,
+              willChange: "opacity, transform",
             };
 
             if (link.external) {
@@ -100,7 +119,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={() => setOpen(false)}
-                  className={`${baseClass} ${stateClass}`}
+                  className={className}
                   style={style}
                   data-track-link={link.id}
                 >
@@ -114,7 +133,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
                 key={link.href}
                 href={link.href}
                 onClick={() => setOpen(false)}
-                className={`${baseClass} ${stateClass}`}
+                className={className}
                 style={style}
               >
                 {link.label}
