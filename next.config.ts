@@ -1,7 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Autorise le HMR depuis le réseau local (téléphone, autre appareil)
+  // Sécurité : uniquement actif en mode dev
+  allowedDevOrigins: ["192.168.1.27", "*.local"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.ufs.sh",
+        pathname: "/f/**",
+      },
+      {
+        protocol: "https",
+        hostname: "utfs.io",
+        pathname: "/f/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
