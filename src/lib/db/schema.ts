@@ -54,6 +54,24 @@ export const photos = pgTable("photos", {
   height: integer("height"),
   fileSize: integer("file_size"),
   mimeType: text("mime_type"),
+  takenAt: timestamp("taken_at"),
+  description: text("description"),
+  infoFields: jsonb("info_fields")
+    .$type<Array<{ label: string; value: string; url?: string }>>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
+  exif: jsonb("exif").$type<{
+    make?: string;
+    model?: string;
+    lensModel?: string;
+    focalLength?: number;
+    fNumber?: number;
+    iso?: number;
+    exposureTime?: string;
+    takenAt?: string;
+    gps?: { lat: number; lng: number };
+  }>(),
+  likesCount: integer("likes_count").notNull().default(0),
   order: integer("order").notNull().default(0),
   featuredOrder: integer("featured_order").notNull().default(0),
   displayWidth: text("display_width").default("auto"),
@@ -90,6 +108,42 @@ export const pageViews = pgTable("page_views", {
   userAgent: text("user_agent"),
   country: text("country"),
   sessionId: text("session_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const projects = pgTable("projects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  coverPhotoId: uuid("cover_photo_id"),
+  visible: boolean("visible").notNull().default(true),
+  order: integer("order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const projectPhotos = pgTable(
+  "project_photos",
+  {
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    photoId: uuid("photo_id")
+      .notNull()
+      .references(() => photos.id, { onDelete: "cascade" }),
+    order: integer("order").notNull().default(0),
+    addedAt: timestamp("added_at").notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.projectId, t.photoId] })],
+);
+
+export const photoLikes = pgTable("photo_likes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  photoId: uuid("photo_id")
+    .notNull()
+    .references(() => photos.id, { onDelete: "cascade" }),
+  sessionId: text("session_id").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -152,3 +206,6 @@ export type Interaction = typeof interactions.$inferSelect;
 export type ContactSubmission = typeof contactSubmissions.$inferSelect;
 export type ClientGallery = typeof clientGalleries.$inferSelect;
 export type ClientGalleryPhoto = typeof clientGalleryPhotos.$inferSelect;
+export type Project = typeof projects.$inferSelect;
+export type ProjectPhoto = typeof projectPhotos.$inferSelect;
+export type PhotoLike = typeof photoLikes.$inferSelect;

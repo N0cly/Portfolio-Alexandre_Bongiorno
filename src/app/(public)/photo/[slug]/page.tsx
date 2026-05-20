@@ -7,6 +7,9 @@ import { photos } from "@/lib/db/schema";
 import { eq, and, asc, desc, sql, or } from "drizzle-orm";
 import { getSiteContent } from "@/lib/site-content";
 import { slugify } from "@/lib/slug";
+import { MarkdownText } from "@/components/MarkdownText";
+import { PhotoExif, PhotoMap } from "@/components/PhotoExif";
+import { LikeButton } from "@/components/LikeButton";
 
 async function getPhotoBySlug(slug: string) {
   try {
@@ -279,6 +282,89 @@ export default async function PhotoPage({
             )}
           </figcaption>
         </figure>
+
+        {/* Bouton like */}
+        <div className="mb-12 flex items-center justify-end">
+          <LikeButton
+            photoId={photo.id}
+            initialCount={photo.likesCount ?? 0}
+          />
+        </div>
+
+        {/* Description longue + métadonnées */}
+        {(photo.description ||
+          photo.takenAt ||
+          (photo.infoFields && photo.infoFields.length > 0) ||
+          photo.exif) && (
+          <section className="mb-16 grid gap-12 border-t border-neutral-300 pt-12 md:grid-cols-3">
+            {photo.description && (
+              <div className="md:col-span-2">
+                <p className="mb-3 text-xs uppercase tracking-[0.3em] text-neutral-500">
+                  À propos de cette photo
+                </p>
+                <div
+                  className="space-y-4 text-base leading-relaxed text-neutral-700"
+                  style={{ fontFamily: "var(--font-serif)" }}
+                >
+                  <MarkdownText>{photo.description}</MarkdownText>
+                </div>
+              </div>
+            )}
+
+            {(photo.takenAt ||
+              (photo.infoFields && photo.infoFields.length > 0) ||
+              photo.exif) && (
+              <aside className="space-y-5">
+                {photo.takenAt && (
+                  <div>
+                    <p className="mb-1 text-xs uppercase tracking-[0.3em] text-neutral-500">
+                      Date
+                    </p>
+                    <p
+                      className="text-base text-neutral-700"
+                      style={{ fontFamily: "var(--font-serif)" }}
+                    >
+                      {new Date(photo.takenAt).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                )}
+                {photo.infoFields &&
+                  photo.infoFields.map((field, i) => (
+                    <div key={i}>
+                      <p className="mb-1 text-xs uppercase tracking-[0.3em] text-neutral-500">
+                        {field.label}
+                      </p>
+                      {field.url ? (
+                        <a
+                          href={field.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-baseline gap-1 text-base text-neutral-900 underline-offset-4 transition hover:underline"
+                          style={{ fontFamily: "var(--font-serif)" }}
+                        >
+                          {field.value}
+                          <span className="text-xs text-neutral-400">↗</span>
+                        </a>
+                      ) : (
+                        <p
+                          className="text-base text-neutral-700"
+                          style={{ fontFamily: "var(--font-serif)" }}
+                        >
+                          {field.value}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                <PhotoExif exif={photo.exif as never} />
+                <PhotoMap gps={photo.exif?.gps ?? null} />
+              </aside>
+            )}
+          </section>
+        )}
 
         {/* Prev / Next */}
         {(prev || next) && (

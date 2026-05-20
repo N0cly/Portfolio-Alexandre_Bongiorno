@@ -3,7 +3,13 @@
 import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { updatePhoto } from "@/app/admin/photos/actions";
+import { updatePhoto, extractPhotoExif } from "@/app/admin/photos/actions";
+
+export type InfoField = {
+  label: string;
+  value: string;
+  url?: string;
+};
 
 export type EditablePhoto = {
   id: string;
@@ -13,6 +19,20 @@ export type EditablePhoto = {
   slug: string | null;
   category: string | null;
   tags: string[];
+  takenAt: string | null; // ISO date string
+  description: string | null;
+  infoFields: InfoField[];
+  exif: {
+    make?: string;
+    model?: string;
+    lensModel?: string;
+    focalLength?: number;
+    fNumber?: number;
+    iso?: number;
+    exposureTime?: string;
+    takenAt?: string;
+    gps?: { lat: number; lng: number };
+  } | null;
   placement: string | null;
   displayWidth: string | null;
   displayHeight: string | null;
@@ -56,7 +76,7 @@ const placementOptions: {
   {
     value: "hero",
     label: "Photo hero",
-    help: "Plein écran d'accueil. Si plusieurs photos sont hero, la plus récente est choisie.",
+    help: "Plein écran d'accueil. L'ancienne photo hero passera automatiquement en galerie.",
   },
 ];
 
@@ -141,6 +161,37 @@ export function PhotoEditor({
   const [objectFit, setObjectFit] = useState(photo.objectFit ?? "cover");
   const [visible, setVisible] = useState(photo.visible);
 
+  // Date prise de vue (format YYYY-MM-DD pour input type=date)
+  const initialTakenAt = photo.takenAt
+    ? new Date(photo.takenAt).toISOString().slice(0, 10)
+    : "";
+  const [takenAt, setTakenAt] = useState(initialTakenAt);
+  const [description, setDescription] = useState(photo.description ?? "");
+  const [infoFields, setInfoFields] = useState<InfoField[]>(
+    photo.infoFields ?? [],
+  );
+
+  function addInfoField() {
+    setInfoFields((prev) => [...prev, { label: "", value: "", url: "" }]);
+  }
+  function updateInfoField(i: number, patch: Partial<InfoField>) {
+    setInfoFields((prev) =>
+      prev.map((f, idx) => (idx === i ? { ...f, ...patch } : f)),
+    );
+  }
+  function removeInfoField(i: number) {
+    setInfoFields((prev) => prev.filter((_, idx) => idx !== i));
+  }
+  function moveInfoField(i: number, direction: -1 | 1) {
+    setInfoFields((prev) => {
+      const next = [...prev];
+      const j = i + direction;
+      if (j < 0 || j >= next.length) return prev;
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  }
+
   useEffect(() => {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -173,12 +224,24 @@ export function PhotoEditor({
           ]
         : tags;
 
+      // Filtre les infoFields vides
+      const cleanedInfoFields = infoFields
+        .filter((f) => f.label.trim() && f.value.trim())
+        .map((f) => ({
+          label: f.label.trim(),
+          value: f.value.trim(),
+          url: f.url && f.url.trim().length > 0 ? f.url.trim() : undefined,
+        }));
+
       const result = await updatePhoto({
         id: photo.id,
         title: title.trim(),
         alt: alt.trim(),
         slug: slug.trim() || undefined,
         tags: finalTags,
+        takenAt: takenAt || null,
+        description: description.trim() || null,
+        infoFields: cleanedInfoFields,
         placement,
         displayWidth: displayWidth as "1" | "2" | "3" | "4" | "5",
         displayHeight: displayHeight as
@@ -220,7 +283,7 @@ export function PhotoEditor({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white text-neutral-900 shadow-2xl md:flex-row"
+        className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white text-neutral-900 shadow-2xl md:flex-row"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Aperçu */}
@@ -242,7 +305,7 @@ export function PhotoEditor({
         {/* Formulaire */}
         <form
           onSubmit={onSubmit}
-          className="flex flex-1 flex-col overflow-y-auto"
+          className="flex min-h-0 flex-1 flex-col overflow-hidden"
         >
           <header className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
             <h2 className="text-lg font-light">Éditer la photo</h2>
@@ -256,7 +319,7 @@ export function PhotoEditor({
             </button>
           </header>
 
-          <div className="flex-1 space-y-5 px-6 py-5">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
             <Field
               label="Titre"
               help="Nom affiché sous la photo sur le site"
@@ -280,6 +343,134 @@ export function PhotoEditor({
                 onChange={(e) => setAlt(e.target.value)}
                 placeholder="Description détaillée de l'image"
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+              />
+            </Field>
+
+            <Field
+              label="EXIF"
+              help="Métadonnées techniques extraites du fichier (appareil, focale, ISO, GPS...)"
+            >
+              {photo.exif ? (
+                <div className="space-y-2 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {photo.exif.make && (
+                      <div>
+                        <span className="text-neutral-500">Marque : </span>
+                        <span>{photo.exif.make}</span>
+                      </div>
+                    )}
+                    {photo.exif.model && (
+                      <div>
+                        <span className="text-neutral-500">Boîtier : </span>
+                        <span>{photo.exif.model}</span>
+                      </div>
+                    )}
+                    {photo.exif.lensModel && (
+                      <div className="col-span-2">
+                        <span className="text-neutral-500">Objectif : </span>
+                        <span>{photo.exif.lensModel}</span>
+                      </div>
+                    )}
+                    {photo.exif.focalLength && (
+                      <div>
+                        <span className="text-neutral-500">Focale : </span>
+                        <span>{photo.exif.focalLength} mm</span>
+                      </div>
+                    )}
+                    {photo.exif.fNumber && (
+                      <div>
+                        <span className="text-neutral-500">Ouverture : </span>
+                        <span>ƒ/{photo.exif.fNumber}</span>
+                      </div>
+                    )}
+                    {photo.exif.iso && (
+                      <div>
+                        <span className="text-neutral-500">ISO : </span>
+                        <span>{photo.exif.iso}</span>
+                      </div>
+                    )}
+                    {photo.exif.exposureTime && (
+                      <div>
+                        <span className="text-neutral-500">Vitesse : </span>
+                        <span>{photo.exif.exposureTime}</span>
+                      </div>
+                    )}
+                    {photo.exif.gps && (
+                      <div className="col-span-2">
+                        <span className="text-neutral-500">GPS : </span>
+                        <span>
+                          {photo.exif.gps.lat.toFixed(5)},{" "}
+                          {photo.exif.gps.lng.toFixed(5)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => {
+                      startTransition(async () => {
+                        await extractPhotoExif(photo.id);
+                        router.refresh();
+                      });
+                    }}
+                    className="text-xs text-neutral-600 underline-offset-4 hover:text-neutral-900 hover:underline disabled:opacity-50"
+                  >
+                    {isPending ? "Lecture…" : "↻ Re-extraire l'EXIF"}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    startTransition(async () => {
+                      await extractPhotoExif(photo.id);
+                      router.refresh();
+                    });
+                  }}
+                  className="w-full rounded-md border border-dashed border-neutral-400 bg-white px-3 py-2 text-xs uppercase tracking-wider text-neutral-700 hover:border-neutral-900 disabled:opacity-50 transition"
+                >
+                  {isPending ? "Lecture…" : "Extraire les métadonnées EXIF"}
+                </button>
+              )}
+            </Field>
+
+            <Field
+              label="Date prise de vue"
+              help="Date du shooting. Affichée sur la page photo (optionnel)."
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={takenAt}
+                  onChange={(e) => setTakenAt(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+                />
+                {takenAt && (
+                  <button
+                    type="button"
+                    onClick={() => setTakenAt("")}
+                    className="text-xs text-neutral-500 hover:text-neutral-900"
+                  >
+                    Effacer
+                  </button>
+                )}
+              </div>
+            </Field>
+
+            <Field
+              label="Description (longue)"
+              help="Texte affiché sur la page individuelle de la photo. Pour ajouter un lien dans le texte, utilise plutôt la section « Informations supplémentaires »."
+            >
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                maxLength={5000}
+                placeholder="Quelques mots sur la photo, le contexte, l'histoire..."
+                className="w-full resize-y rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
               />
             </Field>
 
@@ -344,6 +535,96 @@ export function PhotoEditor({
                     <option key={t} value={t} />
                   ))}
                 </datalist>
+              </div>
+            </Field>
+
+            <Field
+              label="Informations supplémentaires"
+              help="Ajoute autant de champs que tu veux (Événement, Lieu, Client, Matériel...). Si tu mets une URL, la valeur devient un lien cliquable sur la page publique."
+            >
+              <div className="space-y-3">
+                {infoFields.length === 0 && (
+                  <p className="rounded-md border border-dashed border-neutral-300 px-3 py-3 text-center text-xs text-neutral-500">
+                    Aucune info. Clique sur « + Ajouter » pour commencer.
+                  </p>
+                )}
+                {infoFields.map((field, i) => (
+                  <div
+                    key={i}
+                    className="space-y-2 rounded-md border border-neutral-200 bg-neutral-50 p-3"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={field.label}
+                        onChange={(e) =>
+                          updateInfoField(i, { label: e.target.value })
+                        }
+                        placeholder="Label (ex: Événement)"
+                        maxLength={60}
+                        className="flex-1 rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-xs font-medium outline-none focus:border-neutral-900"
+                      />
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => moveInfoField(i, -1)}
+                          disabled={i === 0}
+                          className="rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs hover:bg-neutral-100 disabled:opacity-30"
+                          aria-label="Monter"
+                          title="Monter"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveInfoField(i, 1)}
+                          disabled={i === infoFields.length - 1}
+                          className="rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs hover:bg-neutral-100 disabled:opacity-30"
+                          aria-label="Descendre"
+                          title="Descendre"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeInfoField(i)}
+                          className="rounded border border-red-300 bg-white px-2 py-0.5 text-xs text-red-700 hover:bg-red-50"
+                          aria-label="Supprimer"
+                          title="Supprimer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="text"
+                      value={field.value}
+                      onChange={(e) =>
+                        updateInfoField(i, { value: e.target.value })
+                      }
+                      placeholder="Valeur (ex: Festival Lollapalooza)"
+                      maxLength={500}
+                      className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-neutral-900"
+                    />
+                    <input
+                      type="url"
+                      value={field.url ?? ""}
+                      onChange={(e) =>
+                        updateInfoField(i, { url: e.target.value })
+                      }
+                      placeholder="Lien optionnel (https://...)"
+                      maxLength={500}
+                      className="w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 font-mono text-xs outline-none focus:border-neutral-900"
+                    />
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addInfoField}
+                  className="w-full rounded-md border border-dashed border-neutral-400 bg-white px-3 py-2 text-xs uppercase tracking-wider text-neutral-700 hover:border-neutral-900 hover:bg-neutral-50 transition"
+                >
+                  + Ajouter une info
+                </button>
               </div>
             </Field>
 
@@ -500,7 +781,10 @@ export function PhotoEditor({
             )}
           </div>
 
-          <footer className="flex items-center justify-end gap-3 border-t border-neutral-200 px-6 py-4">
+          <footer className="flex shrink-0 items-center justify-end gap-3 border-t border-neutral-200 bg-white px-6 py-4">
+            {error && (
+              <p className="mr-auto text-sm text-red-700">{error}</p>
+            )}
             <button
               type="button"
               onClick={onClose}

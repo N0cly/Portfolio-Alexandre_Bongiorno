@@ -6,6 +6,9 @@ import { db } from "./db";
 import { users } from "./db/schema";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Auto-trusté sur Vercel via VERCEL env, mais nécessaire pour `next start` local
+  // ou tout autre hébergement (Coolify, Docker, etc.)
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [

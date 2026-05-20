@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
 import { PhotosManager } from "@/components/admin/PhotosManager";
+import { BulkExifImporter } from "@/components/admin/BulkExifImporter";
 import { getAllAdminTags } from "@/lib/tags";
 
 type View = "all" | "selection";
@@ -149,6 +150,8 @@ export default async function PhotosAdmin({
         </div>
       )}
 
+      {view === "all" && <BulkExifImporter />}
+
       <PhotosManager
         existingTags={existingTags}
         context={view === "selection" ? "selection" : "gallery"}
@@ -160,6 +163,10 @@ export default async function PhotosAdmin({
           slug: r.slug,
           category: r.category,
           tags: r.tags ?? [],
+          takenAt: r.takenAt ? r.takenAt.toISOString() : null,
+          description: r.description,
+          infoFields: r.infoFields ?? [],
+          exif: r.exif ?? null,
           placement: r.placement,
           displayWidth: r.displayWidth,
           displayHeight: r.displayHeight,
