@@ -5,30 +5,31 @@ import { eq, asc, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projects, projectPhotos, photos } from "@/lib/db/schema";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Projets",
   description: "Séries et projets photographiques.",
 };
 
-async function getProjects() {
+type ProjectCard = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  coverUrl: string | null;
+  photoCount: number;
+};
+
+async function getProjects(): Promise<ProjectCard[]> {
   try {
-    return await db
+    const rows = await db
       .select({
         id: projects.id,
         slug: projects.slug,
         name: projects.name,
         description: projects.description,
         coverPhotoId: projects.coverPhotoId,
-        coverUrl: sql<string | null>`(
-          select ${photos.url} from ${photos}
-          where ${photos.id} = coalesce(
-            ${projects.coverPhotoId},
-            (select ${projectPhotos.photoId} from ${projectPhotos}
-              where ${projectPhotos.projectId} = ${projects.id}
-              order by ${projectPhotos.order} asc limit 1)
-          )
-          limit 1
-        )`,
         photoCount: sql<number>`(
           select count(*)::int from ${projectPhotos}
           where ${projectPhotos.projectId} = ${projects.id}
@@ -37,6 +38,45 @@ async function getProjects() {
       .from(projects)
       .where(eq(projects.visible, true))
       .orderBy(asc(projects.order));
+
+    // Pour chaque projet, on résout l'URL de couverture en JS (plus simple
+    // et plus fiable qu'un coalesce SQL complexe avec sous-requête).
+    return Promise.all(
+      rows.map(async (p) => {
+        let coverUrl: string | null = null;
+
+        // 1) Couverture explicite
+        if (p.coverPhotoId) {
+          const [photo] = await db
+            .select({ url: photos.url })
+            .from(photos)
+            .where(eq(photos.id, p.coverPhotoId))
+            .limit(1);
+          coverUrl = photo?.url ?? null;
+        }
+
+        // 2) Fallback : première photo du projet
+        if (!coverUrl) {
+          const [first] = await db
+            .select({ url: photos.url })
+            .from(projectPhotos)
+            .innerJoin(photos, eq(photos.id, projectPhotos.photoId))
+            .where(eq(projectPhotos.projectId, p.id))
+            .orderBy(asc(projectPhotos.order))
+            .limit(1);
+          coverUrl = first?.url ?? null;
+        }
+
+        return {
+          id: p.id,
+          slug: p.slug,
+          name: p.name,
+          description: p.description,
+          coverUrl,
+          photoCount: p.photoCount,
+        };
+      }),
+    );
   } catch {
     return [];
   }

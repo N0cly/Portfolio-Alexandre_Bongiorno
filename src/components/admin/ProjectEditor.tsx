@@ -70,6 +70,26 @@ export function ProjectEditor({
     });
   }
 
+  // Auto-sauvegarde immédiate de la couverture (sans avoir à cliquer Enregistrer)
+  function handleSetCover(newCoverId: string | null) {
+    setCoverPhotoId(newCoverId);
+    startTransition(async () => {
+      const r = await updateProject({
+        id: project.id,
+        coverPhotoId: newCoverId,
+      });
+      if (r.ok) {
+        flash(
+          newCoverId ? "Couverture définie ✓" : "Couverture retirée",
+        );
+        router.refresh();
+      } else {
+        flash(`Erreur : ${r.error}`);
+        setCoverPhotoId(project.coverPhotoId); // rollback
+      }
+    });
+  }
+
   function handleDelete() {
     if (
       !confirm(
@@ -127,36 +147,17 @@ export function ProjectEditor({
         <h2 className="mb-4 text-sm uppercase tracking-[0.2em] text-neutral-500">
           Paramètres
         </h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-neutral-700">
-              Nom
-            </span>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-neutral-700">
-              Photo de couverture
-            </span>
-            <select
-              value={coverPhotoId ?? ""}
-              onChange={(e) => setCoverPhotoId(e.target.value || null)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
-            >
-              <option value="">(première photo du projet)</option>
-              {selectedPhotos.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title ?? p.alt ?? p.id.slice(0, 8)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <label className="block">
+          <span className="mb-1 block text-xs font-medium text-neutral-700">
+            Nom
+          </span>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+          />
+        </label>
         <label className="mt-4 block">
           <span className="mb-1 block text-xs font-medium text-neutral-700">
             Description
@@ -216,38 +217,92 @@ export function ProjectEditor({
 
       {/* Photos du projet */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-4 text-sm uppercase tracking-[0.2em] text-neutral-500">
-          Photos du projet ({selectedPhotos.length})
-        </h2>
+        <header className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm uppercase tracking-[0.2em] text-neutral-500">
+            Photos du projet ({selectedPhotos.length})
+          </h2>
+          {selectedPhotos.length > 0 && (
+            <p className="text-xs text-neutral-500">
+              Clique sur une photo pour la définir comme couverture (badge ★)
+            </p>
+          )}
+        </header>
         {selectedPhotos.length === 0 ? (
           <p className="text-sm text-neutral-500">
             Aucune photo. Ajoute-en depuis la section ci-dessous.
           </p>
         ) : (
-          <div className="grid grid-cols-3 gap-3 md:grid-cols-5 lg:grid-cols-6">
-            {selectedPhotos.map((p) => (
-              <div
-                key={p.id}
-                className="group relative aspect-square overflow-hidden rounded-lg bg-neutral-100"
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {selectedPhotos.map((p) => {
+                const isCover = coverPhotoId === p.id;
+                return (
+                  <div
+                    key={p.id}
+                    className="group relative aspect-square overflow-hidden rounded-lg bg-neutral-100"
+                  >
+                    <Image
+                      src={p.url}
+                      alt={p.alt ?? ""}
+                      fill
+                      sizes="200px"
+                      className="object-cover"
+                    />
+                    {/* Clic sur toute la tile : toggle couverture (auto-sauvegarde) */}
+                    <button
+                      type="button"
+                      onClick={() => handleSetCover(isCover ? null : p.id)}
+                      disabled={isPending}
+                      aria-label={
+                        isCover
+                          ? "Retirer comme couverture"
+                          : "Définir comme couverture"
+                      }
+                      title={
+                        isCover
+                          ? "Couverture actuelle (clic pour retirer)"
+                          : "Définir comme couverture"
+                      }
+                      className={`absolute inset-0 z-10 ring-inset transition ${
+                        isCover
+                          ? "ring-4 ring-amber-500"
+                          : "ring-0 ring-amber-500 hover:ring-2"
+                      }`}
+                    />
+                    {isCover && (
+                      <div className="pointer-events-none absolute left-2 top-2 z-20 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] uppercase tracking-wider text-white shadow">
+                        ★ Couverture
+                      </div>
+                    )}
+                    {/* Bouton retirer du projet, au-dessus du ring */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemove(p.id);
+                      }}
+                      disabled={isPending}
+                      className="absolute right-1.5 top-1.5 z-30 rounded-full bg-white/95 px-2 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition"
+                      title="Retirer du projet"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            {coverPhotoId && (
+              <button
+                type="button"
+                onClick={() => handleSetCover(null)}
+                disabled={isPending}
+                className="mt-3 text-xs text-neutral-500 underline-offset-4 hover:text-neutral-900 hover:underline disabled:opacity-50"
               >
-                <Image
-                  src={p.url}
-                  alt={p.alt ?? ""}
-                  fill
-                  sizes="200px"
-                  className="object-cover"
-                />
-                <button
-                  onClick={() => handleRemove(p.id)}
-                  disabled={isPending}
-                  className="absolute right-1.5 top-1.5 rounded-full bg-white/90 px-2 py-0.5 text-xs opacity-0 group-hover:opacity-100 transition"
-                  title="Retirer"
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
+                Retirer la couverture personnalisée (utiliser la première photo
+                automatiquement)
+              </button>
+            )}
+          </>
         )}
       </section>
 

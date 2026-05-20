@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { links } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { links, projects } from "@/lib/db/schema";
+import { eq, asc, sql } from "drizzle-orm";
 import { getSiteContent } from "@/lib/site-content";
 import { MobileNav } from "./MobileNav";
 
@@ -17,14 +17,28 @@ async function getLinks() {
   }
 }
 
+async function hasVisibleProjects(): Promise<boolean> {
+  try {
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(projects)
+      .where(eq(projects.visible, true));
+    return (count ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
 export async function PublicHeader() {
-  const [externalLinks, content] = await Promise.all([
+  const [externalLinks, content, showProjects] = await Promise.all([
     getLinks(),
     getSiteContent(),
+    hasVisibleProjects(),
   ]);
 
   const allLinks = [
     { href: "/gallery", label: "Galerie" },
+    ...(showProjects ? [{ href: "/projets", label: "Projets" }] : []),
     { href: "/about", label: "À propos" },
     { href: "/contact", label: "Contact" },
     ...externalLinks.map((l) => ({
@@ -54,6 +68,14 @@ export async function PublicHeader() {
           <Link href="/gallery" className="hover:text-neutral-900 transition">
             Galerie
           </Link>
+          {showProjects && (
+            <Link
+              href="/projets"
+              className="hover:text-neutral-900 transition"
+            >
+              Projets
+            </Link>
+          )}
           <Link href="/about" className="hover:text-neutral-900 transition">
             À propos
           </Link>
