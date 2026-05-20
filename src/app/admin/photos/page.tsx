@@ -4,7 +4,49 @@ import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
 import { PhotosManager } from "@/components/admin/PhotosManager";
 import { BulkExifImporter } from "@/components/admin/BulkExifImporter";
+import { SelectionPresets } from "@/components/admin/SelectionPresets";
 import { getAllAdminTags } from "@/lib/tags";
+import { selectionPresets, selectionPresetPhotos } from "@/lib/db/schema";
+
+async function getPresets() {
+  try {
+    const rows = await db
+      .select({
+        id: selectionPresets.id,
+        name: selectionPresets.name,
+        updatedAt: selectionPresets.updatedAt,
+      })
+      .from(selectionPresets)
+      .orderBy(desc(selectionPresets.updatedAt));
+
+    // Pour chaque preset, on récupère les photos (jusqu'à 12 pour preview)
+    const presetsWithPhotos = await Promise.all(
+      rows.map(async (preset) => {
+        const presetPhotos = await db
+          .select({
+            id: photos.id,
+            url: photos.url,
+          })
+          .from(selectionPresetPhotos)
+          .innerJoin(photos, eq(photos.id, selectionPresetPhotos.photoId))
+          .where(eq(selectionPresetPhotos.presetId, preset.id))
+          .orderBy(asc(selectionPresetPhotos.order));
+
+        return {
+          id: preset.id,
+          name: preset.name,
+          updatedAt: preset.updatedAt.toISOString(),
+          photoCount: presetPhotos.length,
+          photos: presetPhotos,
+        };
+      }),
+    );
+
+    return presetsWithPhotos;
+  } catch {
+    return [];
+  }
+}
 
 type View = "all" | "selection";
 
@@ -92,10 +134,11 @@ export default async function PhotosAdmin({
   const { view: viewParam } = await searchParams;
   const view: View = viewParam === "selection" ? "selection" : "all";
 
-  const [{ rows, error }, existingTags, counts] = await Promise.all([
+  const [{ rows, error }, existingTags, counts, presets] = await Promise.all([
     getPhotos(view),
     getAllAdminTags(),
     getCounts(),
+    view === "selection" ? getPresets() : Promise.resolve([]),
   ]);
 
   return (
@@ -151,6 +194,8 @@ export default async function PhotosAdmin({
       )}
 
       {view === "all" && <BulkExifImporter />}
+
+      {view === "selection" && <SelectionPresets presets={presets} />}
 
       <PhotosManager
         existingTags={existingTags}

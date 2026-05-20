@@ -4,6 +4,10 @@ import { useEffect, useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { updatePhoto, extractPhotoExif } from "@/app/admin/photos/actions";
+import {
+  DemoteFeaturedModal,
+  type FeaturedBrief,
+} from "./DemoteFeaturedModal";
 
 export type InfoField = {
   label: string;
@@ -208,11 +212,12 @@ export function PhotoEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
+  // État pour le modal de "qui rétrograder"
+  const [demoteOpen, setDemoteOpen] = useState(false);
+  const [demoteCandidates, setDemoteCandidates] = useState<FeaturedBrief[]>([]);
+
+  function callUpdate(demotePhotoId?: string) {
     startTransition(async () => {
-      // Inclus le tag en cours de frappe s'il y en a un
       const finalTags = tagInput.trim()
         ? [
             ...tags,
@@ -224,7 +229,6 @@ export function PhotoEditor({
           ]
         : tags;
 
-      // Filtre les infoFields vides
       const cleanedInfoFields = infoFields
         .filter((f) => f.label.trim() && f.value.trim())
         .map((f) => ({
@@ -254,14 +258,30 @@ export function PhotoEditor({
         rotation,
         objectFit: objectFit as "cover" | "contain",
         visible,
+        demotePhotoId,
       });
+
       if (result.ok) {
+        setDemoteOpen(false);
         router.refresh();
         onClose();
-      } else {
+        return;
+      }
+      if ("needsDemotion" in result && result.needsDemotion) {
+        setDemoteCandidates(result.current);
+        setDemoteOpen(true);
+        return;
+      }
+      if ("error" in result) {
         setError(result.error);
       }
     });
+  }
+
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    callUpdate();
   }
 
   const previewAspect =
@@ -802,6 +822,15 @@ export function PhotoEditor({
           </footer>
         </form>
       </div>
+
+      {/* Modal "qui rétrograder" — apparaît si la sélection est pleine */}
+      <DemoteFeaturedModal
+        open={demoteOpen}
+        photos={demoteCandidates}
+        onClose={() => setDemoteOpen(false)}
+        onConfirm={(demoteId) => callUpdate(demoteId)}
+        isPending={isPending}
+      />
     </div>
   );
 }

@@ -138,6 +138,27 @@ export const projectPhotos = pgTable(
   (t) => [primaryKey({ columns: [t.projectId, t.photoId] })],
 );
 
+export const selectionPresets = pgTable("selection_presets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const selectionPresetPhotos = pgTable(
+  "selection_preset_photos",
+  {
+    presetId: uuid("preset_id")
+      .notNull()
+      .references(() => selectionPresets.id, { onDelete: "cascade" }),
+    photoId: uuid("photo_id")
+      .notNull()
+      .references(() => photos.id, { onDelete: "cascade" }),
+    order: integer("order").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.presetId, t.photoId] })],
+);
+
 export const photoLikes = pgTable("photo_likes", {
   id: uuid("id").primaryKey().defaultRandom(),
   photoId: uuid("photo_id")
@@ -209,3 +230,5 @@ export type ClientGalleryPhoto = typeof clientGalleryPhotos.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type ProjectPhoto = typeof projectPhotos.$inferSelect;
 export type PhotoLike = typeof photoLikes.$inferSelect;
+export type SelectionPreset = typeof selectionPresets.$inferSelect;
+export type SelectionPresetPhoto = typeof selectionPresetPhotos.$inferSelect;

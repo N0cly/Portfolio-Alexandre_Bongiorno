@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
 import { extractExifFromUrl } from "@/lib/exif";
+import { MAX_FEATURED, type FeaturedPhotoBrief } from "@/lib/photos-constants";
 
 const infoFieldSchema = z.object({
   label: z.string().min(1).max(60),
@@ -36,11 +37,18 @@ const updatePhotoSchema = z.object({
   rotation: z.number().int().min(-15).max(15).optional(),
   objectFit: z.enum(["cover", "contain"]).optional(),
   visible: z.boolean().optional(),
+  // ID d'une photo featured à rétrograder en gallery pour faire de la place
+  demotePhotoId: z.string().uuid().optional(),
 });
+
 
 export async function updatePhoto(
   input: z.infer<typeof updatePhotoSchema>,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; error: string }
+  | { ok: false; needsDemotion: true; current: FeaturedPhotoBrief[] }
+> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Unauthorized" };
 
@@ -49,7 +57,7 @@ export async function updatePhoto(
     return { ok: false, error: "Invalid input" };
   }
 
-  const { id, ...fields } = parsed.data;
+  const { id, demotePhotoId, ...fields } = parsed.data;
   if (Object.keys(fields).length === 0) {
     return { ok: false, error: "No changes" };
   }
@@ -60,7 +68,6 @@ export async function updatePhoto(
     dbFields.takenAt = fields.takenAt ? new Date(fields.takenAt) : null;
   }
   if ("infoFields" in fields && Array.isArray(fields.infoFields)) {
-    // Nettoie les URLs vides
     dbFields.infoFields = fields.infoFields.map((f) => ({
       label: f.label,
       value: f.value,
@@ -69,17 +76,44 @@ export async function updatePhoto(
   }
 
   try {
-    // Si on définit ce photo comme hero : démote toute autre hero en gallery
+    // Hero auto-démote : la photo précédente passe en gallery (ou en featured si demandé ?)
+    // On la passe en gallery par défaut comme demandé : "la précédente est retirée du hero et mise dans galerie uniquement"
     if (parsed.data.placement === "hero") {
       await db
         .update(photos)
         .set({ placement: "gallery", updatedAt: new Date() })
+        .where(and(eq(photos.placement, "hero"), sql`${photos.id} <> ${id}`));
+    }
+
+    // Cap de 6 photos dans la sélection (placement = "featured")
+    if (parsed.data.placement === "featured") {
+      const featuredOthers = await db
+        .select({
+          id: photos.id,
+          url: photos.url,
+          title: photos.title,
+          alt: photos.alt,
+        })
+        .from(photos)
         .where(
-          and(
-            eq(photos.placement, "hero"),
-            sql`${photos.id} <> ${id}`,
-          ),
+          and(eq(photos.placement, "featured"), sql`${photos.id} <> ${id}`),
         );
+
+      if (featuredOthers.length >= MAX_FEATURED) {
+        if (!demotePhotoId) {
+          // Pas de choix → renvoie la liste pour que l'admin choisisse
+          return {
+            ok: false,
+            needsDemotion: true,
+            current: featuredOthers,
+          };
+        }
+        // Démote la photo choisie en gallery
+        await db
+          .update(photos)
+          .set({ placement: "gallery", updatedAt: new Date() })
+          .where(eq(photos.id, demotePhotoId));
+      }
     }
 
     await db.update(photos).set(dbFields).where(eq(photos.id, id));
