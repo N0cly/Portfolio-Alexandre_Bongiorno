@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { hasAnalyticsConsent, CONSENT_EVENT } from "./CookieConsent";
 
 function getSessionId(): string {
   if (typeof window === "undefined") return "";
@@ -24,25 +25,38 @@ export function PageViewTracker() {
     if (!pathname || pathname.startsWith("/admin") || pathname === "/login") {
       return;
     }
-    if (lastPath.current === pathname) return;
-    lastPath.current = pathname;
 
-    const sessionId = getSessionId();
-    const referrer = document.referrer || undefined;
+    const send = () => {
+      // Mesure d'audience soumise au consentement (le session_id n'est
+      // créé qu'après accord).
+      if (!hasAnalyticsConsent()) return;
+      if (lastPath.current === pathname) return;
+      lastPath.current = pathname;
 
-    fetch("/api/stats", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      keepalive: true,
-      body: JSON.stringify({
-        type: "pageview",
-        path: pathname,
-        referrer,
-        sessionId,
-      }),
-    }).catch(() => {
-      /* silently fail — stats shouldn't break UX */
-    });
+      const sessionId = getSessionId();
+      const referrer = document.referrer || undefined;
+
+      fetch("/api/stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
+          type: "pageview",
+          path: pathname,
+          referrer,
+          sessionId,
+        }),
+      }).catch(() => {
+        /* silently fail — stats shouldn't break UX */
+      });
+    };
+
+    send();
+
+    // Si l'utilisateur accepte après l'affichage, on enregistre la vue courante.
+    const onConsent = () => send();
+    window.addEventListener(CONSENT_EVENT, onConsent);
+    return () => window.removeEventListener(CONSENT_EVENT, onConsent);
   }, [pathname]);
 
   return null;
@@ -55,6 +69,8 @@ export function trackInteraction(params: {
   metadata?: Record<string, unknown>;
 }) {
   if (typeof window === "undefined") return;
+  // Pas de mesure d'audience sans consentement.
+  if (!hasAnalyticsConsent()) return;
   const sessionId = getSessionId();
   fetch("/api/stats", {
     method: "POST",

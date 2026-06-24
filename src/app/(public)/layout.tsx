@@ -2,6 +2,7 @@ import { Cormorant_Garamond, Inter } from "next/font/google";
 import { PublicHeader } from "@/components/PublicHeader";
 import { PublicFooter } from "@/components/PublicFooter";
 import { PageViewTracker } from "@/components/PageViewTracker";
+import { CookieConsent } from "@/components/CookieConsent";
 
 const serif = Cormorant_Garamond({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function PublicLayout({
       <PageViewTracker />
       <div className="flex-1">{children}</div>
       <PublicFooter />
+      <CookieConsent />
     </div>
   );
 }
