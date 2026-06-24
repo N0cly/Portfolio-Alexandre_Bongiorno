@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function MentionsLegalesPage() {
-  const { editor, host, developer } = legalInfo;
+  const { editor, host, developer, photographer } = legalInfo;
 
   return (
     <LegalPage eyebrow="Informations légales" title="Mentions légales">
@@ -74,11 +74,29 @@ export default function MentionsLegalesPage() {
 
       <LegalSection title="Propriété intellectuelle">
         <p>
-          L&apos;ensemble des photographies, textes et éléments graphiques
-          présents sur ce site sont la propriété exclusive de l&apos;éditeur,
-          sauf mention contraire. Toute reproduction, représentation,
-          modification ou diffusion, totale ou partielle, sans autorisation
-          écrite préalable est interdite et constitue une contrefaçon
+          Les photographies présentes sur ce site sont la propriété exclusive
+          de {photographer.name} (le photographe), qui en détient l&apos;intégralité
+          des droits d&apos;auteur. Toute reproduction, représentation ou
+          diffusion, totale ou partielle, sans son autorisation écrite préalable
+          est interdite.
+        </p>
+        <p>
+          Le code source, la conception et le développement du site sont la
+          propriété de{" "}
+          <a
+            href={developer.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-4 hover:opacity-70"
+          >
+            {developer.name}
+          </a>
+          , sauf cession expresse de ces droits convenue par contrat. Toute
+          reproduction ou réutilisation du code sans autorisation est interdite.
+        </p>
+        <p>
+          Les autres contenus (textes, éléments graphiques) demeurent la
+          propriété de leurs auteurs respectifs. Toute contrefaçon est
           sanctionnée par le Code de la propriété intellectuelle.
         </p>
       </LegalSection>

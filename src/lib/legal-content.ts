@@ -15,13 +15,19 @@ export const legalInfo = {
   // À COMPLÉTER : ces informations sont obligatoires (LCEN art. 6-III).
   editor: {
     name: "Enzo BEDOS", // ex. "Alexandre Bongiorno"
-    legalStatus: "auto-entrepreneur", // ex. "Micro-entreprise (auto-entrepreneur)"
+    legalStatus: "Micro-entreprise (auto-entrepreneur)", // ex. "Micro-entreprise (auto-entrepreneur)"
     siret: "939 642 377",
     vatNumber: "", // n° TVA intracommunautaire si assujetti, sinon ""
     address: "Av de la cote bleue, 13820 Ensues-la-Redonne, France",
     email: "enzo.bedos@nocly.fr",
     phone: "", // facultatif
     publicationDirector: "Enzo BEDOS", // en général = name
+  },
+
+  photographer: {
+    name: "Alexandre BONGIORNO",
+    address: "Av. de Lacanau, 13700 Marignane, France",
+    email: "alexandre.bongiorno003@gmail.com"
   },
 
   // ── Hébergeur (IONOS) ────────────────────────────────────────────────

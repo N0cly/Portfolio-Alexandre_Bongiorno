@@ -15,9 +15,9 @@ export async function PublicFooter() {
     <footer className="mx-auto w-full max-w-6xl px-8 py-12">
       <div className="space-y-6 border-t border-neutral-300 pt-8">
         <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
-          <p className="text-lg" style={{ fontFamily: "var(--font-serif)" }}>
+          <Link href={"/"} className="text-lg" style={{ fontFamily: "var(--font-serif)" }}>
             {content.studioName}
-          </p>
+          </Link>
 
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs uppercase tracking-[0.15em] text-neutral-500">
             {LEGAL_LINKS.map((link) => (

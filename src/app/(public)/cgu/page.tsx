@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 export default function CguPage() {
-  const { editor } = legalInfo;
+  const { editor, developer, photographer } = legalInfo;
 
   return (
     <LegalPage
@@ -41,12 +41,25 @@ export default function CguPage() {
 
       <LegalSection title="Propriété intellectuelle">
         <p>
-          L&apos;ensemble des contenus du site (photographies, textes,
-          éléments graphiques) est protégé par le droit de la propriété
-          intellectuelle et demeure la propriété exclusive de l&apos;éditeur.
-          Toute reproduction ou utilisation sans autorisation écrite préalable
-          est interdite. Les photographies des galeries clients ne peuvent être
-          diffusées que dans le cadre convenu avec l&apos;éditeur.
+          Les photographies présentes sur le site sont la propriété exclusive
+          du photographe, {photographer.name}, et sont protégées par le droit
+          d&apos;auteur. Les photographies des galeries clients ne peuvent être
+          diffusées que dans le cadre convenu avec celui-ci.
+        </p>
+        <p>
+          Le site lui-même (code source, conception, développement) est la
+          propriété de {" "}
+          <a
+              href={developer.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-4 hover:opacity-70"
+          >
+            {developer.name}
+          </a>, sauf cession expresse convenue par
+          contrat. Toute reproduction ou utilisation des contenus du site, sans
+          autorisation écrite préalable des titulaires de droits concernés, est
+          interdite.
         </p>
       </LegalSection>
 

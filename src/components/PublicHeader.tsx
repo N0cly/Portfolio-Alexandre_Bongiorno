@@ -39,7 +39,6 @@ export async function PublicHeader() {
   const allLinks = [
     { href: "/gallery", label: "Galerie" },
     ...(showProjects ? [{ href: "/projets", label: "Projets" }] : []),
-    { href: "/about", label: "À propos" },
     { href: "/contact", label: "Contact" },
     ...externalLinks.map((l) => ({
       href: l.url,
@@ -47,6 +46,7 @@ export async function PublicHeader() {
       external: true,
       id: l.id,
     })),
+    { href: "/about", label: "À propos" }
   ];
 
   return (
@@ -76,9 +76,6 @@ export async function PublicHeader() {
               Projets
             </Link>
           )}
-          <Link href="/about" className="hover:text-neutral-900 transition">
-            À propos
-          </Link>
           <Link href="/contact" className="hover:text-neutral-900 transition">
             Contact
           </Link>
@@ -94,6 +91,9 @@ export async function PublicHeader() {
               {link.label}
             </a>
           ))}
+          <Link href="/about" className="hover:text-neutral-900 transition">
+            À propos
+          </Link>
         </nav>
 
         {/* Mobile nav — visible < md uniquement */}
