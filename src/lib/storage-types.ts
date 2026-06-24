@@ -2,7 +2,7 @@
 // Ce module est importable côté client (les helpers sont purs).
 
 /** Limite de stockage par défaut : 5 Go. */
-export const STORAGE_LIMIT_BYTES_DEFAULT = 5 * 1024 * 1024 * 1024;
+export const STORAGE_LIMIT_BYTES_DEFAULT = 2 * 1024 * 1024 * 1024;
 
 export type StorageUsage = {
   /** Octets actuellement occupés sur le disque par les photos. */

@@ -18,13 +18,26 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR
   ? path.resolve(process.env.UPLOAD_DIR)
   : path.join(process.cwd(), "uploads");
 
-/** Limite de stockage (octets). Configurable via PHOTO_STORAGE_LIMIT_BYTES. */
+/**
+ * Limite de stockage (octets). Configurable via, par ordre de priorité :
+ *   1. PHOTO_STORAGE_LIMIT_GB    (en Go, décimales acceptées — ex. "2", "1.5")
+ *   2. PHOTO_STORAGE_LIMIT_BYTES (en octets)
+ *   3. défaut : 2 Go
+ */
 export const STORAGE_LIMIT_BYTES = (() => {
-  const raw = process.env.PHOTO_STORAGE_LIMIT_BYTES;
-  const parsed = raw ? Number(raw) : NaN;
-  return Number.isFinite(parsed) && parsed > 0
-    ? parsed
-    : STORAGE_LIMIT_BYTES_DEFAULT;
+  const gb = process.env.PHOTO_STORAGE_LIMIT_GB;
+  if (gb !== undefined && gb.trim() !== "") {
+    const parsedGb = Number(gb);
+    if (Number.isFinite(parsedGb) && parsedGb > 0) {
+      return Math.round(parsedGb * 1024 * 1024 * 1024);
+    }
+  }
+
+  const bytes = process.env.PHOTO_STORAGE_LIMIT_BYTES;
+  const parsedBytes = bytes ? Number(bytes) : NaN;
+  return Number.isFinite(parsedBytes) && parsedBytes > 0
+      ? parsedBytes
+      : STORAGE_LIMIT_BYTES_DEFAULT;
 })();
 
 /** Types MIME image autorisés à l'upload. */
