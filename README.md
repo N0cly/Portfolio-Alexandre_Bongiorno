@@ -1,6 +1,6 @@
 # Photo Portfolio
 
-Portfolio sur mesure pour photographe — Next.js 16 + Neon (Postgres) + Cloudflare R2.
+Portfolio sur mesure pour photographe — Next.js 16 + Neon (Postgres) + stockage local.
 
 ## Stack
 
@@ -8,7 +8,7 @@ Portfolio sur mesure pour photographe — Next.js 16 + Neon (Postgres) + Cloudfl
 - **TypeScript** + **Tailwind CSS v4**
 - **Neon** — Postgres serverless (free tier)
 - **Drizzle ORM** — requêtes type-safe
-- **UploadThing** — stockage des photos (2 GB free, sans CB)
+- **Stockage local** — photos hébergées sur le serveur (quota 2 Go, jauge dans l'admin)
 - **Auth.js v5** — authentification admin (credentials)
 - **dnd-kit** — drag & drop dans l'admin
 
@@ -38,14 +38,19 @@ Colle-le dans `AUTH_SECRET`.
    npm run db:push
    ```
 
-### 3. Stockage des photos — UploadThing
+### 3. Stockage des photos — local (serveur)
 
-1. Crée un compte sur https://uploadthing.com (login via GitHub, pas de CB)
-2. Crée une nouvelle app dans le dashboard
-3. Va dans **API Keys**, copie le `UPLOADTHING_TOKEN` (commence par `eyJ...`)
-4. Colle-le dans `.env.local`
+Les photos sont écrites sur le disque du serveur (plus de service externe).
 
-Free tier : 2 GB de stockage. Si tu dépasses, passe au plan payant (~10 $/mois pour 100 GB) ou migre vers R2 plus tard.
+- Répertoire par défaut : `<racine>/uploads` (modifiable via `UPLOAD_DIR`).
+- Quota par défaut : **2 Go** (modifiable via `PHOTO_STORAGE_LIMIT_BYTES`, en octets).
+- Quand le quota est atteint : un avertissement s'affiche dans l'admin et les
+  nouveaux uploads sont bloqués jusqu'à libération d'espace (suppression de photos).
+- Une **jauge** de place restante est affichée sur la page d'ajout de photos
+  (et dans l'uploader des galeries clients).
+
+> ⚠️ Le répertoire `UPLOAD_DIR` doit être **persistant**. En conteneur, monte un
+> volume dessus pour ne pas perdre les photos à chaque redéploiement.
 
 ### 4. Créer le compte admin
 
@@ -83,10 +88,10 @@ src/
 ├── lib/
 │   ├── db/               # Drizzle (schema + client)
 │   ├── auth.ts                # Config Auth.js
-│   ├── uploadthing.ts         # File router UploadThing (server)
-│   ├── uploadthing-client.ts  # UploadButton/Dropzone (client)
+│   ├── storage.ts             # Stockage local (disque) + quota (server)
+│   ├── storage-types.ts       # Types/helpers partagés (client + server)
 │   └── utils.ts               # Helpers (cn)
-└── middleware.ts         # Protection des routes /admin
+└── proxy.ts              # Protection des routes /admin
 ```
 
 ## Tables (Drizzle schema)
@@ -99,12 +104,17 @@ src/
 - `page_views` — stats de visite
 - `interactions` — clics, hover sur photo, etc.
 
-## Déploiement (Vercel)
+## Déploiement
 
-1. Push sur GitHub
-2. Importe le projet sur https://vercel.com/new
-3. Renseigne les mêmes variables d'env que `.env.local`
-4. Deploy
+Le stockage local nécessite un serveur au **filesystem persistant** :
+
+- ✅ VPS (`next start`), conteneur Docker avec un **volume** monté sur `UPLOAD_DIR`,
+  plateformes type Railway/Render avec disque persistant.
+- ❌ **Vercel** (et autres hébergements serverless) : filesystem éphémère/lecture
+  seule → les fichiers uploadés seraient perdus. Non compatible avec ce stockage.
+
+Exemple de montage Docker : `-v /data/portfolio/uploads:/app/uploads` avec
+`UPLOAD_DIR=/app/uploads`.
 
 ## Étapes suivantes
 
