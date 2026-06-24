@@ -6,8 +6,9 @@ import { hash } from "bcryptjs";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { clientGalleries, clientGalleryPhotos } from "@/lib/db/schema";
+import { clientGalleries, clientGalleryPhotos, photos } from "@/lib/db/schema";
 import { slugify } from "@/lib/slug";
+import { deleteStoredFile } from "@/lib/storage";
 
 async function requireAdmin() {
   const session = await auth();
@@ -112,10 +113,39 @@ export async function deleteClientGallery(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
     await requireAdmin();
+
+    // Photos privées (clientOnly) rattachées à cette galerie : candidates
+    // à la suppression du disque si elles ne servent nulle part ailleurs.
+    const galleryPhotos = await db
+      .select({ id: photos.id, storageKey: photos.storageKey })
+      .from(clientGalleryPhotos)
+      .innerJoin(photos, eq(photos.id, clientGalleryPhotos.photoId))
+      .where(
+        and(
+          eq(clientGalleryPhotos.galleryId, id),
+          eq(photos.clientOnly, true),
+        ),
+      );
+
     const [row] = await db
       .delete(clientGalleries)
       .where(eq(clientGalleries.id, id))
       .returning({ slug: clientGalleries.slug });
+
+    // La suppression de la galerie a cascadé les lignes de jonction.
+    // On purge les photos clientOnly devenues orphelines (fichier + ligne).
+    for (const photo of galleryPhotos) {
+      const stillReferenced = await db
+        .select({ galleryId: clientGalleryPhotos.galleryId })
+        .from(clientGalleryPhotos)
+        .where(eq(clientGalleryPhotos.photoId, photo.id))
+        .limit(1);
+      if (stillReferenced.length === 0) {
+        await deleteStoredFile(photo.storageKey);
+        await db.delete(photos).where(eq(photos.id, photo.id));
+      }
+    }
+
     bump(row?.slug);
     return { ok: true };
   } catch (err) {
@@ -178,6 +208,30 @@ export async function removePhotoFromGallery(
           eq(clientGalleryPhotos.photoId, photoId),
         ),
       );
+
+    // Si la photo est privée (clientOnly) et n'est plus rattachée à aucune
+    // galerie, on la supprime du disque pour libérer de l'espace.
+    const [photo] = await db
+      .select({
+        id: photos.id,
+        clientOnly: photos.clientOnly,
+        storageKey: photos.storageKey,
+      })
+      .from(photos)
+      .where(eq(photos.id, photoId));
+
+    if (photo?.clientOnly) {
+      const stillReferenced = await db
+        .select({ galleryId: clientGalleryPhotos.galleryId })
+        .from(clientGalleryPhotos)
+        .where(eq(clientGalleryPhotos.photoId, photoId))
+        .limit(1);
+      if (stillReferenced.length === 0) {
+        await deleteStoredFile(photo.storageKey);
+        await db.delete(photos).where(eq(photos.id, photoId));
+      }
+    }
+
     revalidatePath(`/admin/client-galleries/${galleryId}`);
     return { ok: true };
   } catch (err) {

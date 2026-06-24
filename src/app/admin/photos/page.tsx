@@ -6,6 +6,7 @@ import { PhotosManager } from "@/components/admin/PhotosManager";
 import { BulkExifImporter } from "@/components/admin/BulkExifImporter";
 import { SelectionPresets } from "@/components/admin/SelectionPresets";
 import { getAllAdminTags } from "@/lib/tags";
+import { getStorageUsage } from "@/lib/storage";
 import { selectionPresets, selectionPresetPhotos } from "@/lib/db/schema";
 
 async function getPresets() {
@@ -134,12 +135,14 @@ export default async function PhotosAdmin({
   const { view: viewParam } = await searchParams;
   const view: View = viewParam === "selection" ? "selection" : "all";
 
-  const [{ rows, error }, existingTags, counts, presets] = await Promise.all([
-    getPhotos(view),
-    getAllAdminTags(),
-    getCounts(),
-    view === "selection" ? getPresets() : Promise.resolve([]),
-  ]);
+  const [{ rows, error }, existingTags, counts, presets, storage] =
+    await Promise.all([
+      getPhotos(view),
+      getAllAdminTags(),
+      getCounts(),
+      view === "selection" ? getPresets() : Promise.resolve([]),
+      getStorageUsage().catch(() => null),
+    ]);
 
   return (
     <div className="space-y-8">
@@ -200,6 +203,7 @@ export default async function PhotosAdmin({
       <PhotosManager
         existingTags={existingTags}
         context={view === "selection" ? "selection" : "gallery"}
+        initialStorage={storage}
         photos={rows.map((r) => ({
           id: r.id,
           url: r.url,

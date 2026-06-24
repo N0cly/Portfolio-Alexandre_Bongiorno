@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { UTApi } from "uploadthing/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { photos } from "@/lib/db/schema";
+import { deleteStoredFile } from "@/lib/storage";
+
+export const runtime = "nodejs";
 
 export async function DELETE(
   _req: Request,
@@ -21,11 +23,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Supprime le fichier du disque (sans effet si clé distante/ancienne).
   try {
-    const utapi = new UTApi();
-    await utapi.deleteFiles(photo.storageKey);
+    await deleteStoredFile(photo.storageKey);
   } catch (err) {
-    console.error("Failed to delete from UploadThing", err);
+    console.error("Échec de suppression du fichier local", err);
   }
 
   await db.delete(photos).where(eq(photos.id, id));

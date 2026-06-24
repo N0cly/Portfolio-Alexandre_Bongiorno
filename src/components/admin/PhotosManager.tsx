@@ -21,11 +21,11 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { useUploadThing } from "@/lib/uploadthing-client";
 import { reorderPhotos } from "@/app/admin/photos/actions";
 import { PhotoEditor, type EditablePhoto } from "./PhotoEditor";
+import { StorageGauge, useStorageUsage } from "./StorageGauge";
+import { isStorageFull, type StorageUsage } from "@/lib/storage-types";
 
-const BATCH_SIZE = 10;
 const MAX_FILE_SIZE_MB = 25;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
@@ -61,12 +61,23 @@ export function PhotosManager({
   photos,
   existingTags,
   context = "gallery",
+  initialStorage = null,
 }: {
   photos: ServerPhoto[];
   existingTags: string[];
   context?: "gallery" | "selection";
+  initialStorage?: StorageUsage | null;
 }) {
   const router = useRouter();
+  const {
+    usage,
+    refresh: refreshUsage,
+    applyUsage,
+  } = useStorageUsage(initialStorage);
+  const storageFull = usage ? isStorageFull(usage) : false;
+  const storageFullRef = useRef(false);
+  storageFullRef.current = storageFull;
+
   const [uploads, setUploads] = useState<LocalUpload[]>([]);
   const [orderedPhotos, setOrderedPhotos] = useState<ServerPhoto[]>(photos);
   const [isDragging, setIsDragging] = useState(false);
@@ -91,11 +102,6 @@ export function PhotosManager({
     }),
   );
 
-  const { startUpload } = useUploadThing("photoUploader", {
-    onClientUploadComplete: () => {},
-    onUploadError: () => {},
-  });
-
   const updateUploadsByFiles = useCallback(
     (files: File[], patch: Partial<LocalUpload>) => {
       setUploads((prev) =>
@@ -117,31 +123,46 @@ export function PhotosManager({
       );
       if (pending.length === 0) break;
 
-      const batch = pending.slice(0, BATCH_SIZE);
-      const batchFiles = batch.map((b) => b.file);
-      updateUploadsByFiles(batchFiles, { status: "uploading" });
+      // Upload séquentiel (un fichier par requête) : chaque envoi voit
+      // l'espace déjà consommé par le précédent, ce qui rend le contrôle
+      // de quota côté serveur fiable.
+      const item = pending[0];
+      const single = [item.file];
+      updateUploadsByFiles(single, { status: "uploading" });
 
       try {
-        const result = await startUpload(batchFiles);
-        if (result) {
-          updateUploadsByFiles(batchFiles, { status: "done" });
+        const fd = new FormData();
+        fd.append("files", item.file, item.file.name);
+        const res = await fetch("/api/upload", { method: "POST", body: fd });
+        const data = await res.json().catch(() => null);
+
+        if (data?.usage) applyUsage(data.usage);
+
+        const fileResult = data?.results?.[0];
+        if (res.ok && fileResult?.ok) {
+          updateUploadsByFiles(single, { status: "done" });
           router.refresh();
-        } else {
-          updateUploadsByFiles(batchFiles, {
+        } else if (fileResult?.quota || res.status === 413) {
+          updateUploadsByFiles(single, {
             status: "error",
-            error: "Upload échoué",
+            error: "Stockage plein — libère de l'espace",
+          });
+        } else {
+          updateUploadsByFiles(single, {
+            status: "error",
+            error: fileResult?.error ?? "Upload échoué",
           });
         }
       } catch (err) {
-        updateUploadsByFiles(batchFiles, {
+        updateUploadsByFiles(single, {
           status: "error",
-          error: err instanceof Error ? err.message : "Erreur",
+          error: err instanceof Error ? err.message : "Erreur réseau",
         });
       }
     }
 
     isUploadingRef.current = false;
-  }, [startUpload, updateUploadsByFiles, router]);
+  }, [updateUploadsByFiles, applyUsage, router]);
 
   const updateById = useCallback(
     (id: string, patch: Partial<LocalUpload>) => {
@@ -159,6 +180,18 @@ export function PhotosManager({
 
       Array.from(files).forEach((file) => {
         const id = crypto.randomUUID();
+        if (storageFullRef.current) {
+          initialItems.push({
+            id,
+            file,
+            previewUrl: file.type.startsWith("image/")
+              ? URL.createObjectURL(file)
+              : "",
+            status: "rejected",
+            error: "Stockage plein",
+          });
+          return;
+        }
         if (!file.type.startsWith("image/")) {
           initialItems.push({
             id,
@@ -283,6 +316,7 @@ export function PhotosManager({
     setDeletingId(null);
     if (res.ok) {
       router.refresh();
+      refreshUsage();
     } else {
       alert("Erreur lors de la suppression");
     }
@@ -327,18 +361,25 @@ export function PhotosManager({
 
   return (
     <div className="space-y-6">
+      <StorageGauge usage={usage} />
+
       <div
         onDragOver={(e) => {
           e.preventDefault();
-          setIsDragging(true);
+          if (!storageFull) setIsDragging(true);
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition ${
-          isDragging
-            ? "border-neutral-900 bg-neutral-50"
-            : "border-neutral-300 hover:border-neutral-500"
+        onClick={() => {
+          if (!storageFull) fileInputRef.current?.click();
+        }}
+        aria-disabled={storageFull}
+        className={`rounded-2xl border-2 border-dashed p-6 text-center transition ${
+          storageFull
+            ? "cursor-not-allowed border-red-200 bg-red-50/50 opacity-70"
+            : isDragging
+              ? "cursor-pointer border-neutral-900 bg-neutral-50"
+              : "cursor-pointer border-neutral-300 hover:border-neutral-500"
         }`}
       >
         <input
@@ -346,19 +387,34 @@ export function PhotosManager({
           type="file"
           accept="image/*"
           multiple
+          disabled={storageFull}
           className="hidden"
           onChange={(e) => {
             if (e.target.files) addFiles(e.target.files);
             e.target.value = "";
           }}
         />
-        <p className="text-sm font-medium text-neutral-700">
-          Glisse tes photos ici ou clique pour parcourir
-        </p>
-        <p className="mt-1 text-xs text-neutral-500">
-          Taille max {MAX_FILE_SIZE_MB} MB · Compression auto (max 2400px / 3MB)
-          · Pas de limite de nombre
-        </p>
+        {storageFull ? (
+          <>
+            <p className="text-sm font-medium text-red-700">
+              Stockage plein — upload désactivé
+            </p>
+            <p className="mt-1 text-xs text-red-600">
+              Supprime des photos ci-dessous pour libérer de l&apos;espace et
+              réactiver l&apos;envoi.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-medium text-neutral-700">
+              Glisse tes photos ici ou clique pour parcourir
+            </p>
+            <p className="mt-1 text-xs text-neutral-500">
+              Taille max {MAX_FILE_SIZE_MB} MB · Compression auto (max 2400px /
+              3MB) · Pas de limite de nombre
+            </p>
+          </>
+        )}
       </div>
 
       {(totalInProgress > 0 ||
